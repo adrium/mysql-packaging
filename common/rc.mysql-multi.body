@@ -477,11 +477,20 @@ else
 			--pid-file="$pid_file" \
 			--socket="$socket" \
 			--datadir="$datadir" &>/dev/null &
+		SAFE_MYSQLD_PID=$?
 
-		wait_for_socket "$socket" || {
-			# let's not treat this as a fatal error
-			echo "warning: $socket didn't appear within 30 seconds"
-		}
+		wait_longer=true
+		while [ "x$wait_longer" = "xtrue" ]; do
+			wait_longer=false
+			wait_for_socket "$socket" || {
+				# let's not treat this as a fatal error
+				echo "warning: $socket didn't appear within 30 seconds"
+				if kill -0 $SAFE_MYSQLD_PID; then
+					echo "mysqld is still running, waiting longer..."
+					wait_longer=true
+				fi
+			}
+		done
 		chmod a+r "$pid_file"
 
 		# Rmember status and be verbose
